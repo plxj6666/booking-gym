@@ -1,8 +1,74 @@
+import json
 import time
 import datetime
-from selenium.webdriver import Chrome
+
+import requests
+from selenium.webdriver import Chrome, ActionChains
 from selenium.webdriver.common.by import By
 from utils import init_driver, login
+import base64
+
+
+class YdmVerify(object):
+    _custom_url = "http://api.jfbym.com/api/YmServer/customApi"
+    _token = "vybeXw8HV7rbd5dBdHcqzRbVvly141-UVUhC5Z8nmAM"
+    _headers = {
+        'Content-Type': 'application/json'
+    }
+
+    def slide_verify(self, slide_image, background_image, verify_type="20111"):
+        # 滑块类型
+        # 通用双图滑块  20111
+        payload = {
+            "slide_image": slide_image,
+            "background_image": background_image,
+            "token": self._token,
+            "type": verify_type
+        }
+
+        resp = requests.post(self._custom_url, headers=self._headers, data=json.dumps(payload))
+        # print(resp.text)
+        return resp.json()['data']['data']
+
+
+def skip_verify(driver: Chrome):
+    # 下载验证码背景图片
+    canvas = driver.find_element(By.XPATH,
+                                 '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/canvas')
+    back_ground_64 = driver.execute_script("""
+                        var canvas = arguments[0];
+                        return canvas.toDataURL('image/png').substring(22);
+                    """, canvas)
+
+    slider_pic = driver.find_element(By.XPATH,
+                                     '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[2]/div/div[2]/div[2]/div[1]/div[1]/img')
+    # 获取图片的src属性值
+    image_src = slider_pic.get_attribute('src')
+
+    # 检查图片src是否是Base64编码
+    if image_src.startswith('data:image'):
+        # 提取Base64编码部分
+        slider_base64_data = image_src.split(',')[1]
+    else:
+        # 如果不是Base64编码，则需要下载图片并进行编码
+        import requests
+        response = requests.get(image_src)
+        slider_base64_data = base64.b64encode(response.content).decode('utf-8')
+
+    y = YdmVerify()
+    distance = int(y.slide_verify(slider_base64_data, back_ground_64, verify_type="20111")) - 22  # 验证码应该位移的轨迹
+    distance = int(distance * (50 / 63))  # 这个误差我不知道怎么得出的
+    print(f"验证码位移距离为{distance}")
+    # 找到滑块元素
+    slider = driver.find_element(By.XPATH,
+                                 '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[2]/div/div[2]/div[2]/div[2]/div[1]/div[1]/img')
+
+    # 使用ActionChains模拟拖动滑块
+    action = ActionChains(driver)
+    action.click_and_hold(slider).perform()
+    action.move_by_offset(distance, 0).perform()
+    time.sleep(0.5)
+    action.release().perform()
 
 
 time_table = {1: "8:00-9:00", 2: "9:00-10:00", 3: "10:00-11:00", 4: "11:00-12:00", 5: "12:00-13:00", 6: "13:00-14:00", 7: "14:00-15:00", 8: "15:00-16:00", 9: "16:00-17:00", 10: "17:00-18:00", 11: "18:00-19:00", 12: "19:00-20:00", 13: "20:00-21:00"}
@@ -45,8 +111,8 @@ def xuanze_shijian(times: list, driver: Chrome, num: int, accept: int):
     if chosen:
         confirm_button = driver.find_element(By.XPATH, '//*[@id="app"]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[1]/uni-view[3]/uni-view[2]/uni-view[3]')
         confirm_button.click()
-        print("已出现验证码，请立即完成，避免预约失败！")
-        time.sleep(3)  # 给你3秒完成验证码
+        # 完成验证码：
+        skip_verify(driver)
         return True
     else:
         print("时间段均已被预约")
