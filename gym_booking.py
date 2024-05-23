@@ -57,7 +57,8 @@ def skip_verify(driver: Chrome):
 
     y = YdmVerify()
     distance = int(y.slide_verify(slider_base64_data, back_ground_64, verify_type="20111")) - 22  # 验证码应该位移的轨迹
-    distance = int(distance * (50 / 63))  # 这个误差我不知道怎么得出的
+    # distance = 63
+    distance = distance * (50 / 63)  # 这个误差我不知道怎么得出的
     print(f"验证码位移距离为{distance}")
     # 找到滑块元素
     slider = driver.find_element(By.XPATH,
@@ -67,7 +68,7 @@ def skip_verify(driver: Chrome):
     action = ActionChains(driver)
     action.click_and_hold(slider).perform()
     action.move_by_offset(distance, 0).perform()
-    time.sleep(0.5)
+    time.sleep(0.1)
     action.release().perform()
 
 
