@@ -1,19 +1,25 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
-# 假设这些导入模块存在且有效
 from badminton_booking import book_badminton
 from pingpong_booking import book_pingpong
 from gym_booking import book_gym
 from utils import init_driver, login
 
 # 时间表
-time_table = {1: "8:00-9:00", 2: "9:00-10:00", 3: "10:00-11:00", 4: "11:00-12:00", 5: "12:00-13:00", 6: "13:00-14:00", 7: "14:00-15:00", 8: "15:00-16:00", 9: "16:00-17:00", 10: "17:00-18:00", 11: "18:00-19:00", 12: "19:00-20:00", 13: "20:00-21:00"}
+time_table = {1: "8:00-9:00", 2: "9:00-10:00", 3: "10:00-11:00", 4: "11:00-12:00", 5: "12:00-13:00", 6: "13:00-14:00",
+              7: "14:00-15:00", 8: "15:00-16:00", 9: "16:00-17:00", 10: "17:00-18:00", 11: "18:00-19:00",
+              12: "19:00-20:00", 13: "20:00-21:00"}
+# 场地表
+ground_table = {'松园体育馆': 10, '竹园体育馆': 9, '星湖体育馆': 6, '卓尔体育馆': 18, '风雨体育馆': 6}
+
+
 def gui_app():
     # 主窗口初始化
     # 初始场馆选项
     gym_choices = {'松园体育馆': 1, '竹园体育馆': 2, '星湖体育馆': 3, '卓尔体育馆': 4, '风雨体育馆': 5}
     time_choices = time_table
+
     # 更新场馆选项的函数
     def update_gym_choices(event):
         nonlocal gym_choices, time_choices  # 使用nonlocal声明，以便可以修改外部函数的变量
@@ -29,11 +35,27 @@ def gui_app():
             time_choices = {1: "16:00-18:00", 2: "19:00-21:00"}
         else:
             gym_choices = {}
+
         gym_dropdown['values'] = list(gym_choices.keys())
         gym_dropdown.current(0)
         time_list.delete(0, tk.END)
         for time in time_choices.values():
             time_list.insert(tk.END, time)
+
+        update_ground_choices(None)
+
+    # 更新场地号选择的函数
+    def update_ground_choices(event):
+        for widget in ground_frame.winfo_children():
+            widget.destroy()
+        gym_name = gym_dropdown.get()
+        if gym_name in ground_table:
+            max_ground = ground_table[gym_name]
+            for i in range(max_ground):
+                cb = tk.Checkbutton(ground_frame, text=str(i + 1), variable=ground_vars[i])
+                cb.grid(row=i // 5, column=i % 5)
+        else:
+            messagebox.showerror("错误", "选择的场馆无效！")
 
     # 提交按钮的回调函数
     def on_submit():
@@ -44,9 +66,10 @@ def gui_app():
         gym = gym_choices[gym_dropdown.get()]
         fav_time = [int(time) + 1 for time in time_list.curselection()]
         accept = accept_var.get()
-
-        if not username or not password or not fav_time:
-            messagebox.showerror("错误", "请完整填写所有字段！")
+        ground_choice = [i + 1 for i, var in enumerate(ground_vars) if var.get()]
+        print(ground_choice)
+        if not username or not password or not fav_time or not ground_choice:
+            messagebox.showerror("错误", "请完整填写所有字段并选择场地号！")
             return
         driver = init_driver()
         if not login(driver, username, password, activity_ch):
@@ -55,11 +78,11 @@ def gui_app():
             return
         booking_result = False
         if activity == '羽毛球':
-            booking_result = book_badminton(driver, gym, fav_time, accept, activity_ch)
+            booking_result = book_badminton(driver, gym, fav_time, accept, activity_ch, ground_choice)
         elif activity == '乒乓球':
-            booking_result = book_pingpong(driver, gym, fav_time, accept, activity_ch)
+            booking_result = book_pingpong(driver, gym, fav_time, accept, activity_ch, ground_choice)
         elif activity == '健身房':
-            booking_result = book_gym(driver, gym, fav_time, accept, activity_ch)
+            booking_result = book_gym(driver, gym, fav_time, accept, activity_ch, ground_choice)
 
         if booking_result:
             messagebox.showinfo("成功", "预约成功！如有版本问题请自行维护或Email至argc_xiang@whu.edu.cn")
@@ -111,7 +134,7 @@ def gui_app():
 
     window = tk.Tk()
     window.title("体育场馆预约系统")
-    window.geometry("500x350")
+    window.geometry("500x450")
     show_custom_prompt()
     # 字体设置
     font_setting = ('Georgia', 11)
@@ -130,29 +153,38 @@ def gui_app():
     tk.Label(window, text="运动", font=font_setting).grid(row=2, column=0)
     activity_var = tk.StringVar()
     activity_choices = {'羽毛球': 1, '乒乓球': 2, '健身房': 3}
-    activity_dropdown = ttk.Combobox(window, textvariable=activity_var, values=list(activity_choices.keys()), font=font_setting, width=23)
+    activity_dropdown = ttk.Combobox(window, textvariable=activity_var, values=list(activity_choices.keys()),
+                                     font=font_setting, width=23)
     activity_dropdown.grid(row=2, column=1)
     activity_dropdown.bind('<<ComboboxSelected>>', update_gym_choices)
 
     tk.Label(window, text="场馆", font=font_setting).grid(row=3, column=0)
     gym_var = tk.StringVar()
-    gym_dropdown = ttk.Combobox(window, textvariable=gym_var, values=list(gym_choices.keys()), font=font_setting, width=23)
+    gym_dropdown = ttk.Combobox(window, textvariable=gym_var, values=list(gym_choices.keys()), font=font_setting,
+                                width=23)
     gym_dropdown.grid(row=3, column=1)
+    gym_dropdown.bind('<<ComboboxSelected>>', update_ground_choices)
 
     tk.Label(window, text="时间", font=font_setting).grid(row=4, column=0)
     time_list = tk.Listbox(window, font=font_setting, selectmode=tk.MULTIPLE, exportselection=0, width=23, height=6)
     init_time_list()
     time_list.grid(row=4, column=1)
 
-    tk.Label(window, text="是否接受不完全预约", font=font_setting).grid(row=5, column=0)
+    tk.Label(window, text="场地号", font=font_setting).grid(row=5, column=0)
+    ground_frame = tk.Frame(window)
+    ground_frame.grid(row=5, column=1, columnspan=2, pady=5)
+    ground_vars = [tk.IntVar() for _ in range(max(ground_table.values()))]
+
+    tk.Label(window, text="是否接受不完全预约", font=font_setting).grid(row=6, column=0)
     accept_var = tk.IntVar()
-    tk.Radiobutton(window, text="是", variable=accept_var, value=1, font=font_setting).grid(row=5, column=1)
-    tk.Radiobutton(window, text="否", variable=accept_var, value=2, font=font_setting).grid(row=5, column=2)
+    tk.Radiobutton(window, text="是", variable=accept_var, value=1, font=font_setting).grid(row=6, column=1)
+    tk.Radiobutton(window, text="否", variable=accept_var, value=2, font=font_setting).grid(row=6, column=2)
 
     submit_btn = tk.Button(window, text="提交预约", command=on_submit, font=font_setting, width=10)
-    submit_btn.grid(row=6, column=1)
+    submit_btn.grid(row=7, column=1)
 
     window.mainloop()
+
 
 if __name__ == '__main__':
     gui_app()

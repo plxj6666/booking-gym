@@ -3,6 +3,7 @@ import time
 import datetime
 
 import requests
+from selenium.common import NoSuchElementException
 from selenium.webdriver import Chrome, ActionChains
 from selenium.webdriver.common.by import By
 from utils import init_driver, login
@@ -88,6 +89,7 @@ information = []
 def xuanze_shijian(times: list, driver: Chrome, num: int, accept: int):
     chosen = False
     delete_time = []
+    successful_time = []
     last_t = -1
     for t in times:
         if last_t != -1 and t - last_t != 1:
@@ -104,35 +106,48 @@ def xuanze_shijian(times: list, driver: Chrome, num: int, accept: int):
                 return
         time_button.click()
         last_t = t
-        information.append((num - 1, time_table[t]))
         chosen = True
         delete_time.append(t)
     for t in delete_time:
+        successful_time.append(t)
         times.remove(t)
     if chosen:
         confirm_button = driver.find_element(By.XPATH, '//*[@id="app"]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[1]/uni-view[3]/uni-view[2]/uni-view[3]')
         confirm_button.click()
         # 完成验证码：
         skip_verify(driver)
-        return True
+        # 出现成功界面
+        try:
+            success = driver.find_element(By.XPATH,
+                                          '//*[@id="app"]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[1]/uni-view[1]/uni-text/span')
+            if success.text == '预约成功':
+                for t in successful_time:
+                    information.append((num - 1, time_table[t]))
+                return information
+            else:
+                print("时间段已被预约")
+                return []
+        except NoSuchElementException:
+            print("时间段均被预约")
+            return []
     else:
         print("时间段均已被预约")
-        return False
+        return []
 
 
-def book_badminton(driver: Chrome, gym: int, fav_time: list, accept: int, id: int) -> int:
+def book_badminton(driver: Chrome, gym: int, fav_time: list, accept: int, id: int, fav_ground: list) -> int:
     # 遍历每个场地号，查看是否能预约
     yuyue = False
-    i = 2
     wait = True
     while fav_time:  # 有待优化
+        # 第一轮按照用户选择，第二轮随机选 --
         driver.get('https://gym.whu.edu.cn/hsdsqhafive/pages/index/reserve?typeId={}'.format(act_id[id][0]))
-        next_day = driver.find_element(By.XPATH, '//*[@id="app"]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[1]/uni-view[1]/uni-view[3]')
+        next_day = driver.find_element(By.XPATH, '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[1]/uni-view[1]/uni-view[3]')
         # 循环直到当前时间大于18:00，不然抢不到场子
         while wait:
             # 获取当前时间
             now = datetime.datetime.now()
-            target_time = now.replace(hour=18, minute=0, second=1, microsecond=0)
+            target_time = now.replace(hour=18, minute=0, second=0, microsecond=300)
             # 检查当前时间是否大于18:00
             if now > target_time:
                 print(f"已到{now.hour}:{now.minute}:{now.second}:{now.microsecond}！开始预约！")
@@ -148,26 +163,18 @@ def book_badminton(driver: Chrome, gym: int, fav_time: list, accept: int, id: in
         # print(zhankai.get_attribute("class"))
         zhankai.click()
 
-        try:
+        for i in fav_ground:
+            i += 1
             yuyue_button = driver.find_element(By.XPATH, '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[2]/uni-view[2]/uni-view/uni-view[{}]/uni-view[2]/uni-view/uni-view/uni-view[{}]/uni-view[5]/uni-text'.format(int(gym), i))
             # 我们发现每个场馆有他自己的编号id, 且每个场馆的场地号也是有自己的id, 通过这个id我们可以直接定位到对应的场地
             if "disable" in yuyue_button.get_attribute("class"):
                 print("场地{}已预约满".format(i - 1))
                 i += 1
                 continue
-            yuyue_button.click() #  进入选择时间阶段
+            yuyue_button.click()  #  进入选择时间阶段
             if xuanze_shijian(fav_time, driver, i, accept):
                 yuyue = True
             i += 1
-        except:
-            print("抱歉，该体育馆貌似全部被预约了！！！")
-            print("请确认是否还要继续预约该体育馆")
-            flag = input("是否继续预约该体育馆？(y/n)")
-            if flag == 'y':
-                i = 2
-                continue
-            else:
-                break
     if yuyue:
         print(f"预约成功，感谢使用！")
         print("预约信息：")

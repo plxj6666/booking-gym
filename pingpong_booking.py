@@ -119,8 +119,7 @@ def xuanze_shijian(times: list, driver: Chrome, num: int, accept: int):
         return False
 
 
-
-def book_pingpong(driver: Chrome, gym: int, fav_time: list, accept: int, id: int) -> int:
+def book_pingpong(driver: Chrome, gym: int, fav_time: list, accept: int, id: int, fav_ground: list) -> int:
     # 遍历每个场地号，查看是否能预约
     yuyue = False
     i = 2
