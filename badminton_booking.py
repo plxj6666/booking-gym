@@ -86,7 +86,9 @@ gym_zhankai_path = {1: '//*[@id="app"]/uni-app/uni-page/uni-page-wrapper/uni-pag
 gym_name = {1: "松园体育馆", 2: "竹园体育馆", 3: "星湖体育馆", 4: "卓尔体育馆", 5: "风雨体育馆"}
 
 information = []
-def xuanze_shijian(times: list, driver: Chrome, num: int, accept: int):
+
+
+def xuanze_shijian(times: list, driver: Chrome, num: int, accept: int) -> list:
     chosen = False
     delete_time = []
     successful_time = []
@@ -139,43 +141,44 @@ def book_badminton(driver: Chrome, gym: int, fav_time: list, accept: int, id: in
     # 遍历每个场地号，查看是否能预约
     yuyue = False
     wait = True
-    while fav_time:  # 有待优化
-        # 第一轮按照用户选择，第二轮随机选 --
-        driver.get('https://gym.whu.edu.cn/hsdsqhafive/pages/index/reserve?typeId={}'.format(act_id[id][0]))
-        next_day = driver.find_element(By.XPATH, '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[1]/uni-view[1]/uni-view[3]')
-        # 循环直到当前时间大于18:00，不然抢不到场子
-        while wait:
-            # 获取当前时间
-            now = datetime.datetime.now()
-            target_time = now.replace(hour=18, minute=0, second=0, microsecond=300)
-            # 检查当前时间是否大于18:00
-            if now > target_time:
-                print(f"已到{now.hour}:{now.minute}:{now.second}:{now.microsecond}！开始预约！")
-                wait = False
-                break  # 结束循环
-            else:
-                print(f"当前时间是{now.hour}:{now.minute}:{now.second}，等待中...")
-                time.sleep(0.1)  # 等待0.1秒再次检查
+    # 只选择用户的场子，如果额外选择候补，则在后面进行另一轮预约
+    driver.get('https://gym.whu.edu.cn/hsdsqhafive/pages/index/reserve?typeId={}'.format(act_id[id][0]))
+    next_day = driver.find_element(By.XPATH, '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[1]/uni-view[1]/uni-view[3]')
+    # 循环直到当前时间大于18:00，不然抢不到场子
+    while wait:
+        # 获取当前时间
+        now = datetime.datetime.now()
+        target_time = now.replace(hour=18, minute=0, second=0, microsecond=500)
+        # 检查当前时间是否大于18:00
+        if now > target_time:
+            print(f"已到{now.hour}:{now.minute}:{now.second}:{now.microsecond}！开始预约！")
+            wait = False
+            break  # 结束循环
+        else:
+            print(f"当前时间是{now.hour}:{now.minute}:{now.second}，等待中...")
+            time.sleep(0.1)  # 等待0.1秒再次检查
 
-        next_day.click()  # 切换到下一天
-        # 展开场馆时间
-        zhankai = driver.find_element(By.XPATH, gym_zhankai_path[int(gym)])
-        # print(zhankai.get_attribute("class"))
-        zhankai.click()
+    next_day.click()  # 切换到下一天
+    # 展开场馆时间
+    zhankai = driver.find_element(By.XPATH, gym_zhankai_path[int(gym)])
+    # print(zhankai.get_attribute("class"))
+    zhankai.click()
 
-        for i in fav_ground:
+    for i in fav_ground:
+        i += 1
+        yuyue_button = driver.find_element(By.XPATH, '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[2]/uni-view[2]/uni-view/uni-view[{}]/uni-view[2]/uni-view/uni-view/uni-view[{}]/uni-view[5]/uni-text'.format(int(gym), i))
+
+        # 我们发现每个场馆有他自己的编号id, 且每个场馆的场地号也是有自己的id, 通过这个id我们可以直接定位到对应的场地
+        if "disable" in yuyue_button.get_attribute("class"):
+            print("场地{}已预约满".format(i - 1))
             i += 1
-            yuyue_button = driver.find_element(By.XPATH, '/html/body/div[1]/uni-app/uni-page/uni-page-wrapper/uni-page-body/uni-view/uni-view[2]/uni-view[2]/uni-view/uni-view[{}]/uni-view[2]/uni-view/uni-view/uni-view[{}]/uni-view[5]/uni-text'.format(int(gym), i))
-            # 我们发现每个场馆有他自己的编号id, 且每个场馆的场地号也是有自己的id, 通过这个id我们可以直接定位到对应的场地
-            if "disable" in yuyue_button.get_attribute("class"):
-                print("场地{}已预约满".format(i - 1))
-                i += 1
-                continue
-            yuyue_button.click()  #  进入选择时间阶段
-            if xuanze_shijian(fav_time, driver, i, accept):
-                yuyue = True
-            i += 1
+            continue
+        yuyue_button.click()  #  进入选择时间阶段
+        if xuanze_shijian(fav_time, driver, i, accept):
+            yuyue = True
+        i += 1
     if yuyue:
+
         print(f"预约成功，感谢使用！")
         print("预约信息：")
         print(f"活动：{act_id[id][1]}")
